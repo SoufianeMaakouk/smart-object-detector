@@ -1,78 +1,94 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Smart Object Monitor</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center">
-  <div class="w-full max-w-3xl bg-white rounded-2xl shadow-lg p-6">
-    <h1 class="text-3xl font-bold text-center mb-6 text-indigo-600">Smart Object Monitor</h1>
+let chart;
 
-    <div class="grid grid-cols-2 gap-6 mb-8">
-      <!-- Count Card -->
-      <div class="bg-indigo-50 rounded-xl shadow p-6 text-center">
-        <h2 class="text-lg font-semibold text-gray-700">Current Count</h2>
-        <p id="count" class="text-4xl font-bold text-indigo-700 mt-2">0</p>
-      </div>
 
-      <!-- Threshold Card -->
-      <div class="bg-green-50 rounded-xl shadow p-6 text-center">
-        <h2 class="text-lg font-semibold text-gray-700">Threshold (cm)</h2>
-        <p id="threshold" class="text-4xl font-bold text-green-700 mt-2">50</p>
-      </div>
-    </div>
+function setStatus(online, ts) {
+els.statusDot.className = 'inline-block w-3 h-3 rounded-full ' + (online ? 'bg-green-500' : 'bg-red-500');
+els.lastUpdate.textContent = ts ? new Date(ts).toLocaleString() : '-';
+}
 
-    <!-- Update Threshold Form -->
-    <div class="bg-gray-50 rounded-xl shadow p-6">
-      <h2 class="text-lg font-semibold mb-4 text-gray-700">Adjust Threshold</h2>
-      <div class="flex gap-3">
-        <input id="newThreshold" type="number" placeholder="Enter new threshold" 
-               class="flex-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400">
-        <button onclick="updateThreshold()" 
-                class="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-          Update
-        </button>
-      </div>
-    </div>
-  </div>
 
-  <script>
-    const backend = "https://smart-object-monitor-backend.onrender.com";
+async function fetchStatus() {
+const r = await fetch(`${BACKEND}/status`);
+const json = await r.json();
+setStatus(json.online, json.lastUpdate);
+}
 
-    async function fetchData() {
-      try {
-        const res = await fetch(backend + "/data");
-        const data = await res.json();
-        document.getElementById("count").innerText = data.count;
-      } catch (err) {
-        console.error("Fetch data error:", err);
-      }
-    }
 
-    async function fetchThreshold() {
-      try {
-        const res = await fetch(backend + "/threshold");
-        const t = await res.text();
-        document.getElementById("threshold").innerText = t;
-      } catch (err) {
-        console.error("Fetch threshold error:", err);
-      }
-    }
+async function fetchLatest() {
+const r = await fetch(`${BACKEND}/data/latest`);
+const json = await r.json();
+els.latestCount.textContent = json?.count ?? '-';
+els.latestDistance.textContent = json?.distance ?? '-';
+}
 
-    async function updateThreshold() {
-      const val = document.getElementById("newThreshold").value;
-      if (!val) return;
-      await fetch(backend + "/threshold", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ threshold: parseInt(val) })
-      });
-      fetchThreshold();
-    }
 
-    setInterval(fetchData, 2000);
-    fetchThreshold();
-  </script>
+async function fetchThreshold() {
+const r = await fetch(`${BACKEND}/threshold`);
+const text = await r.text();
+els.thresholdCurrent.textContent = text;
+}
+
+
+async function fetchHistory() {
+const r = await fetch(`${BACKEND}/data/history?limit=100`);
+const data = await r.json();
+const labels = data.map(d => new Date(d.timestamp).toLocaleTimeString());
+const counts = data.map(d => d.count);
+const distances = data.map(d => d.distance);
+
+
+if (!chart) {
+const ctx = document.getElementById('historyChart').getContext('2d');
+chart = new Chart(ctx, {
+type: 'line',
+data: {
+labels,
+datasets: [
+{ label: 'Count', data: counts },
+{ label: 'Distance (cm)', data: distances }
+]
+},
+options: {
+responsive: true,
+maintainAspectRatio: false,
+scales: { x: { display: true }, y: { beginAtZero: true } }
+}
+});
+} else {
+chart.data.labels = labels;
+chart.data.datasets[0].data = counts;
+chart.data.datasets[1].data = distances;
+chart.update();
+}
+}
+
+
+els.saveThreshold.addEventListener('click', async () => {
+const val = Number(els.thresholdInput.value);
+if (Number.isNaN(val)) return alert('Enter a valid number');
+await fetch(`${BACKEND}/threshold`, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ threshold: val })
+});
+els.thresholdInput.value = '';
+fetchThreshold();
+});
+
+
+async function refreshAll() {
+await Promise.all([
+fetchStatus(),
+fetchLatest(),
+fetchThreshold(),
+fetchHistory(),
+]);
+}
+
+
+refreshAll();
+setInterval(refreshAll, 5000);
+</script>
 </body>
 </html>
