@@ -20,15 +20,23 @@
     <h2 class="font-semibold">Latest Count</h2>
     <p id="latestCount" class="text-xl font-bold">-</p>
   </div>
+  
   <div class="p-4 bg-white rounded shadow">
     <h2 class="font-semibold">Current Threshold</h2>
     <p id="thresholdCurrent">-</p>
     <input type="number" id="thresholdInput" class="border p-1 w-full mb-2">
     <button id="saveThreshold" class="bg-blue-500 text-white px-2 py-1 rounded">Save</button>
   </div>
+
   <div class="p-4 bg-white rounded shadow">
     <h2 class="font-semibold">Reset Counter</h2>
     <button id="resetCounter" class="bg-red-500 text-white px-2 py-1 rounded">Reset Counter</button>
+  </div>
+
+  <div class="p-4 bg-white rounded shadow">
+    <h2 class="font-semibold">Connect to new WiFi</h2>
+    <button id="connectWifi" class="bg-yellow-500 text-white px-2 py-1 rounded">Open WiFi Portal</button>
+    <p class="text-sm mt-1 text-gray-600">ESP will show SSID & password on LCD</p>
   </div>
 </div>
 
@@ -46,7 +54,8 @@ const els = {
   thresholdInput: document.getElementById('thresholdInput'),
   thresholdCurrent: document.getElementById('thresholdCurrent'),
   saveThreshold: document.getElementById('saveThreshold'),
-  resetCounter: document.getElementById('resetCounter')
+  resetCounter: document.getElementById('resetCounter'),
+  connectWifi: document.getElementById('connectWifi')
 };
 
 let chart;
@@ -72,11 +81,11 @@ async function fetchLatest() {
     const newCount = json?.count ?? 0;
     els.latestCount.textContent = newCount;
 
-    if (newCount > lastCount) {
+    // Flash on new object or reset
+    if (newCount !== lastCount) {
       els.latestCount.classList.add('bg-green-200', 'transition-colors');
       setTimeout(() => els.latestCount.classList.remove('bg-green-200'), 500);
     }
-
     lastCount = newCount;
   } catch(e){ console.error(e); }
 }
@@ -99,8 +108,17 @@ async function fetchHistory() {
       const ctx = document.getElementById('historyChart').getContext('2d');
       chart = new Chart(ctx, {
         type: 'line',
-        data: { labels, datasets: [{ label: 'Count', data: counts, borderColor:'blue', backgroundColor:'rgba(0,0,255,0.1)', pointBackgroundColor: counts.map((_,i)=>i===counts.length-1?'green':'blue') }] },
-        options: { responsive:true, maintainAspectRatio:false, scales:{x:{display:true}, y:{beginAtZero:true}} }
+        data: {
+          labels,
+          datasets: [{
+            label: 'Count',
+            data: counts,
+            borderColor: 'blue',
+            backgroundColor: 'rgba(0,0,255,0.1)',
+            pointBackgroundColor: counts.map((_,i)=>i===counts.length-1?'green':'blue')
+          }]
+        },
+        options: { responsive:true, maintainAspectRatio:false }
       });
     } else {
       chart.data.labels = labels;
@@ -111,6 +129,7 @@ async function fetchHistory() {
   } catch(e){ console.error(e); }
 }
 
+// Save threshold
 els.saveThreshold.addEventListener('click', async () => {
   const val = Number(els.thresholdInput.value);
   if (Number.isNaN(val)) return alert('Enter a valid number');
@@ -121,6 +140,7 @@ els.saveThreshold.addEventListener('click', async () => {
   } catch(e){ console.error(e); }
 });
 
+// Reset counter
 els.resetCounter.addEventListener('click', async () => {
   if (!confirm("Are you sure you want to reset the counter?")) return;
   try {
@@ -130,11 +150,25 @@ els.resetCounter.addEventListener('click', async () => {
   } catch(e){ console.error(e); }
 });
 
+// Connect to WiFi portal
+els.connectWifi.addEventListener('click', async () => {
+  if(!confirm("ESP will restart in AP mode for WiFi setup")) return;
+  try {
+    const r = await fetch(`${BACKEND}/wifi`, { method:'POST' });
+    const json = await r.json();
+    if(json.success) alert("ESP will start WiFi portal shortly. Check LCD for SSID/password.");
+  } catch(e){ console.error(e); }
+});
+
+// Refresh all data
 async function refreshAll() {
   await Promise.all([fetchStatus(), fetchLatest(), fetchThreshold(), fetchHistory()]);
 }
 
-document.addEventListener("DOMContentLoaded", () => { refreshAll(); setInterval(refreshAll, 5000); });
+document.addEventListener("DOMContentLoaded", () => {
+  refreshAll();
+  setInterval(refreshAll, 5000);
+});
 </script>
 
 </body>
