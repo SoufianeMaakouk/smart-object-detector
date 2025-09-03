@@ -1,0 +1,57 @@
+
+### `index.html`
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ESP8266 Counter</title>
+  <meta charset="utf-8" />
+</head>
+<body>
+  <h1>ESP8266 People Counter</h1>
+
+  <p>Current Count: <span id="count">0</span></p>
+  <p>Threshold: <span id="threshold">50</span> cm</p>
+
+  <input type="number" id="newThreshold" placeholder="Enter new threshold (cm)">
+  <button onclick="updateThreshold()">Update</button>
+
+  <script>
+    const backend = "https://smart-object-monitor-backend.onrender.com"; // <-- replace
+
+    async function fetchData() {
+      try {
+        const res = await fetch(backend + "/data");
+        const data = await res.json();
+        document.getElementById("count").innerText = data.count;
+      } catch (err) {
+        console.error("Fetch data error:", err);
+      }
+    }
+
+    async function fetchThreshold() {
+      try {
+        const res = await fetch(backend + "/threshold");
+        const t = await res.text();
+        document.getElementById("threshold").innerText = t;
+      } catch (err) {
+        console.error("Fetch threshold error:", err);
+      }
+    }
+
+    async function updateThreshold() {
+      const val = document.getElementById("newThreshold").value;
+      if (!val) return;
+      await fetch(backend + "/threshold", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ threshold: parseInt(val) })
+      });
+      fetchThreshold();
+    }
+
+    setInterval(fetchData, 2000);
+    fetchThreshold();
+  </script>
+</body>
+</html>
