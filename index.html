@@ -1,23 +1,44 @@
-
-### `index.html`
-```html
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>ESP8266 Counter</title>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8">
+  <title>Smart Object Monitor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <h1>ESP8266 People Counter</h1>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <div class="w-full max-w-3xl bg-white rounded-2xl shadow-lg p-6">
+    <h1 class="text-3xl font-bold text-center mb-6 text-indigo-600">Smart Object Monitor</h1>
 
-  <p>Current Count: <span id="count">0</span></p>
-  <p>Threshold: <span id="threshold">50</span> cm</p>
+    <div class="grid grid-cols-2 gap-6 mb-8">
+      <!-- Count Card -->
+      <div class="bg-indigo-50 rounded-xl shadow p-6 text-center">
+        <h2 class="text-lg font-semibold text-gray-700">Current Count</h2>
+        <p id="count" class="text-4xl font-bold text-indigo-700 mt-2">0</p>
+      </div>
 
-  <input type="number" id="newThreshold" placeholder="Enter new threshold (cm)">
-  <button onclick="updateThreshold()">Update</button>
+      <!-- Threshold Card -->
+      <div class="bg-green-50 rounded-xl shadow p-6 text-center">
+        <h2 class="text-lg font-semibold text-gray-700">Threshold (cm)</h2>
+        <p id="threshold" class="text-4xl font-bold text-green-700 mt-2">50</p>
+      </div>
+    </div>
+
+    <!-- Update Threshold Form -->
+    <div class="bg-gray-50 rounded-xl shadow p-6">
+      <h2 class="text-lg font-semibold mb-4 text-gray-700">Adjust Threshold</h2>
+      <div class="flex gap-3">
+        <input id="newThreshold" type="number" placeholder="Enter new threshold" 
+               class="flex-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        <button onclick="updateThreshold()" 
+                class="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+          Update
+        </button>
+      </div>
+    </div>
+  </div>
 
   <script>
-    const backend = "https://smart-object-monitor-backend.onrender.com"; // <-- replace
+    const backend = "https://smart-object-monitor-backend.onrender.com";
 
     async function fetchData() {
       try {
