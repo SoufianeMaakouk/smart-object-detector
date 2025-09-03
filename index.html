@@ -1,39 +1,45 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Smart Object Monitor Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8">
+<title>Smart Object Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body { font-family: sans-serif; margin:20px; }
+  .status { display:flex; align-items:center; gap:10px; }
+  .status-dot { width:12px; height:12px; border-radius:50%; display:inline-block; }
+  .dashboard { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .card { padding:10px; border:1px solid #ccc; border-radius:8px; }
+  #historyChart { width:100%; height:300px; }
+  .flash { background-color: #a0f0a0; transition: background 0.5s; }
+</style>
 </head>
-<body class="bg-gray-100 p-6 font-sans">
+<body>
 
-<h1 class="text-2xl font-bold mb-4">Smart Object Monitor Dashboard</h1>
+<h1>Smart Object Monitor</h1>
 
-<div class="mb-4">
-  Status: <span id="statusDot" class="inline-block w-3 h-3 rounded-full bg-red-500"></span>
-  Last update: <span id="lastUpdate">-</span>
-</div>
-
-<div class="grid grid-cols-2 gap-4 mb-4">
-  <div class="p-4 bg-white rounded shadow">
-    <h2 class="font-semibold">Latest Count</h2>
-    <p id="latestCount" class="text-xl font-bold">-</p>
+<div class="dashboard">
+  <div class="card">
+    <h3>Status</h3>
+    <div class="status">
+      <div id="statusDot" class="status-dot bg-red-500"></div>
+      <span>Last update: <span id="lastUpdate">-</span></span>
+    </div>
+    <h3>Latest Count: <span id="latestCount">-</span></h3>
+    <button id="resetCounter">Reset Counter</button>
   </div>
-  <div class="p-4 bg-white rounded shadow">
-    <h2 class="font-semibold">Current Threshold</h2>
-    <p id="thresholdCurrent">-</p>
-    <input type="number" id="thresholdInput" class="border p-1 w-full mb-2">
-    <button id="saveThreshold" class="bg-blue-500 text-white px-2 py-1 rounded">Save</button>
-  </div>
-  <div class="p-4 bg-white rounded shadow">
-    <h2 class="font-semibold">Reset Counter</h2>
-    <button id="resetCounter" class="bg-red-500 text-white px-2 py-1 rounded">Reset Counter</button>
+
+  <div class="card">
+    <h3>Threshold</h3>
+    Current: <span id="thresholdCurrent">-</span> cm<br>
+    <input id="thresholdInput" type="number" placeholder="New threshold">
+    <button id="saveThreshold">Save</button>
   </div>
 </div>
 
-<div class="bg-white p-4 rounded shadow">
-  <canvas id="historyChart" height="150"></canvas>
+<div class="card">
+  <h3>History (Last 100)</h3>
+  <canvas id="historyChart"></canvas>
 </div>
 
 <script>
@@ -43,17 +49,17 @@ const els = {
   statusDot: document.getElementById('statusDot'),
   lastUpdate: document.getElementById('lastUpdate'),
   latestCount: document.getElementById('latestCount'),
-  thresholdInput: document.getElementById('thresholdInput'),
+  resetCounter: document.getElementById('resetCounter'),
   thresholdCurrent: document.getElementById('thresholdCurrent'),
+  thresholdInput: document.getElementById('thresholdInput'),
   saveThreshold: document.getElementById('saveThreshold'),
-  resetCounter: document.getElementById('resetCounter')
 };
 
 let chart;
 let lastCount = 0;
 
 function setStatus(online, ts) {
-  els.statusDot.className = 'inline-block w-3 h-3 rounded-full ' + (online ? 'bg-green-500' : 'bg-red-500');
+  els.statusDot.style.backgroundColor = online ? 'green' : 'red';
   els.lastUpdate.textContent = ts ? new Date(ts).toLocaleString() : '-';
 }
 
@@ -72,11 +78,11 @@ async function fetchLatest() {
     const newCount = json?.count ?? 0;
     els.latestCount.textContent = newCount;
 
-    if (newCount > lastCount) {
-      els.latestCount.classList.add('bg-green-200', 'transition-colors');
-      setTimeout(() => els.latestCount.classList.remove('bg-green-200'), 500);
+    // Flash if new object or reset
+    if(newCount !== lastCount) {
+      els.latestCount.classList.add('flash');
+      setTimeout(()=>els.latestCount.classList.remove('flash'), 500);
     }
-
     lastCount = newCount;
   } catch(e){ console.error(e); }
 }
@@ -99,8 +105,17 @@ async function fetchHistory() {
       const ctx = document.getElementById('historyChart').getContext('2d');
       chart = new Chart(ctx, {
         type: 'line',
-        data: { labels, datasets: [{ label: 'Count', data: counts, borderColor:'blue', backgroundColor:'rgba(0,0,255,0.1)', pointBackgroundColor: counts.map((_,i)=>i===counts.length-1?'green':'blue') }] },
-        options: { responsive:true, maintainAspectRatio:false, scales:{x:{display:true}, y:{beginAtZero:true}} }
+        data: {
+          labels,
+          datasets: [{
+            label:'Count',
+            data:counts,
+            borderColor:'blue',
+            backgroundColor:'rgba(0,0,255,0.1)',
+            pointBackgroundColor: counts.map((_,i)=>i===counts.length-1?'green':'blue')
+          }]
+        },
+        options: { responsive:true, maintainAspectRatio:false }
       });
     } else {
       chart.data.labels = labels;
@@ -111,6 +126,7 @@ async function fetchHistory() {
   } catch(e){ console.error(e); }
 }
 
+// Save new threshold
 els.saveThreshold.addEventListener('click', async () => {
   const val = Number(els.thresholdInput.value);
   if (Number.isNaN(val)) return alert('Enter a valid number');
@@ -121,21 +137,25 @@ els.saveThreshold.addEventListener('click', async () => {
   } catch(e){ console.error(e); }
 });
 
+// Reset counter
 els.resetCounter.addEventListener('click', async () => {
-  if (!confirm("Are you sure you want to reset the counter?")) return;
+  if(!confirm("Reset counter?")) return;
   try {
     const r = await fetch(`${BACKEND}/reset`, { method:'POST' });
     const json = await r.json();
-    if(json.success){ lastCount=0; fetchLatest(); fetchHistory(); }
+    if(json.success){ lastCount = 0; fetchLatest(); fetchHistory(); }
   } catch(e){ console.error(e); }
 });
 
+// Refresh all data
 async function refreshAll() {
   await Promise.all([fetchStatus(), fetchLatest(), fetchThreshold(), fetchHistory()]);
 }
 
-document.addEventListener("DOMContentLoaded", () => { refreshAll(); setInterval(refreshAll, 5000); });
+document.addEventListener("DOMContentLoaded", ()=> {
+  refreshAll();
+  setInterval(refreshAll, 5000);
+});
 </script>
-
 </body>
 </html>
