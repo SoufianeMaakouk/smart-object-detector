@@ -23,10 +23,6 @@
       <p id="latestCount">-</p>
     </div>
     <div class="p-4 bg-white rounded shadow">
-      <h2 class="font-semibold">Latest Distance (cm)</h2>
-      <p id="latestDistance">-</p>
-    </div>
-    <div class="p-4 bg-white rounded shadow">
       <h2 class="font-semibold">Current Threshold</h2>
       <p id="thresholdCurrent">-</p>
     </div>
@@ -49,7 +45,6 @@
     statusDot: document.getElementById('statusDot'),
     lastUpdate: document.getElementById('lastUpdate'),
     latestCount: document.getElementById('latestCount'),
-    latestDistance: document.getElementById('latestDistance'),
     thresholdInput: document.getElementById('thresholdInput'),
     thresholdCurrent: document.getElementById('thresholdCurrent'),
     saveThreshold: document.getElementById('saveThreshold')
@@ -75,7 +70,6 @@
       const r = await fetch(`${BACKEND}/data/latest`);
       const json = await r.json();
       els.latestCount.textContent = json?.count ?? '-';
-      els.latestDistance.textContent = json?.distance ?? '-';
     } catch(e){ console.error(e); }
   }
 
@@ -93,7 +87,6 @@
       const data = await r.json();
       const labels = data.map(d => new Date(d.timestamp).toLocaleTimeString());
       const counts = data.map(d => d.count);
-      const distances = data.map(d => d.distance);
 
       if (!chart) {
         const ctx = document.getElementById('historyChart').getContext('2d');
@@ -102,16 +95,18 @@
           data: {
             labels,
             datasets: [
-              { label: 'Count', data: counts, borderColor: 'blue', backgroundColor: 'rgba(0,0,255,0.1)' },
-              { label: 'Distance (cm)', data: distances, borderColor: 'green', backgroundColor: 'rgba(0,255,0,0.1)' }
+              { label: 'Count', data: counts, borderColor: 'blue', backgroundColor: 'rgba(0,0,255,0.1)' }
             ]
           },
-          options: { responsive: true, maintainAspectRatio: false, scales: { x: { display: true }, y: { beginAtZero: true } } }
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { x: { display: true }, y: { beginAtZero: true } }
+          }
         });
       } else {
         chart.data.labels = labels;
         chart.data.datasets[0].data = counts;
-        chart.data.datasets[1].data = distances;
         chart.update();
       }
     } catch(e){ console.error(e); }
