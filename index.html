@@ -8,150 +8,134 @@
 </head>
 <body class="bg-gray-100 p-6 font-sans">
 
-  <h1 class="text-2xl font-bold mb-4">Smart Object Monitor Dashboard</h1>
+<h1 class="text-2xl font-bold mb-4">Smart Object Monitor Dashboard</h1>
 
-  <!-- Status -->
-  <div class="mb-4">
-    Status: <span id="statusDot" class="inline-block w-3 h-3 rounded-full bg-red-500"></span>
-    Last update: <span id="lastUpdate">-</span>
+<div class="mb-4">
+  Status: <span id="statusDot" class="inline-block w-3 h-3 rounded-full bg-red-500"></span>
+  Last update: <span id="lastUpdate">-</span>
+</div>
+
+<div class="grid grid-cols-2 gap-4 mb-4">
+  <div class="p-4 bg-white rounded shadow">
+    <h2 class="font-semibold">Latest Count</h2>
+    <p id="latestCount" class="text-xl font-bold">-</p>
   </div>
-
-  <!-- Latest readings -->
-  <div class="grid grid-cols-2 gap-4 mb-4">
-    <div class="p-4 bg-white rounded shadow">
-      <h2 class="font-semibold">Latest Count</h2>
-      <p id="latestCount" class="text-xl font-bold">-</p>
-    </div>
-    <div class="p-4 bg-white rounded shadow">
-      <h2 class="font-semibold">Current Threshold</h2>
-      <p id="thresholdCurrent">-</p>
-    </div>
-    <div class="p-4 bg-white rounded shadow">
-      <h2 class="font-semibold">Set Threshold</h2>
-      <input type="number" id="thresholdInput" class="border p-1 w-full mb-2">
-      <button id="saveThreshold" class="bg-blue-500 text-white px-2 py-1 rounded">Save</button>
-    </div>
+  <div class="p-4 bg-white rounded shadow">
+    <h2 class="font-semibold">Current Threshold</h2>
+    <p id="thresholdCurrent">-</p>
+    <input type="number" id="thresholdInput" class="border p-1 w-full mb-2">
+    <button id="saveThreshold" class="bg-blue-500 text-white px-2 py-1 rounded">Save</button>
   </div>
-
-  <!-- History chart -->
-  <div class="bg-white p-4 rounded shadow">
-    <canvas id="historyChart" height="150"></canvas>
+  <div class="p-4 bg-white rounded shadow">
+    <h2 class="font-semibold">Reset Counter</h2>
+    <button id="resetCounter" class="bg-red-500 text-white px-2 py-1 rounded">Reset Counter</button>
   </div>
+</div>
 
-  <script>
-  const BACKEND = "https://smart-object-monitor-backend.onrender.com";
+<div class="bg-white p-4 rounded shadow">
+  <canvas id="historyChart" height="150"></canvas>
+</div>
 
-  const els = {
-    statusDot: document.getElementById('statusDot'),
-    lastUpdate: document.getElementById('lastUpdate'),
-    latestCount: document.getElementById('latestCount'),
-    thresholdInput: document.getElementById('thresholdInput'),
-    thresholdCurrent: document.getElementById('thresholdCurrent'),
-    saveThreshold: document.getElementById('saveThreshold')
-  };
+<script>
+const BACKEND = "https://smart-object-monitor-backend.onrender.com";
 
-  let chart;
-  let lastCount = 0; // for flash effect
+const els = {
+  statusDot: document.getElementById('statusDot'),
+  lastUpdate: document.getElementById('lastUpdate'),
+  latestCount: document.getElementById('latestCount'),
+  thresholdInput: document.getElementById('thresholdInput'),
+  thresholdCurrent: document.getElementById('thresholdCurrent'),
+  saveThreshold: document.getElementById('saveThreshold'),
+  resetCounter: document.getElementById('resetCounter')
+};
 
-  function setStatus(online, ts) {
-    els.statusDot.className = 'inline-block w-3 h-3 rounded-full ' + (online ? 'bg-green-500' : 'bg-red-500');
-    els.lastUpdate.textContent = ts ? new Date(ts).toLocaleString() : '-';
-  }
+let chart;
+let lastCount = 0;
 
-  async function fetchStatus() {
-    try {
-      const r = await fetch(`${BACKEND}/status`);
-      const json = await r.json();
-      setStatus(json.online, json.lastUpdate);
-    } catch(e){ console.error(e); }
-  }
+function setStatus(online, ts) {
+  els.statusDot.className = 'inline-block w-3 h-3 rounded-full ' + (online ? 'bg-green-500' : 'bg-red-500');
+  els.lastUpdate.textContent = ts ? new Date(ts).toLocaleString() : '-';
+}
 
-  async function fetchLatest() {
-    try {
-      const r = await fetch(`${BACKEND}/data/latest`);
-      const json = await r.json();
-      const newCount = json?.count ?? 0;
-      els.latestCount.textContent = newCount;
+async function fetchStatus() {
+  try {
+    const r = await fetch(`${BACKEND}/status`);
+    const json = await r.json();
+    setStatus(json.online, json.lastUpdate);
+  } catch(e){ console.error(e); }
+}
 
-      // Flash effect if count increased
-      if (newCount > lastCount) {
-        els.latestCount.classList.add('bg-green-200', 'transition-colors');
-        setTimeout(() => els.latestCount.classList.remove('bg-green-200'), 500);
-      }
+async function fetchLatest() {
+  try {
+    const r = await fetch(`${BACKEND}/data/latest`);
+    const json = await r.json();
+    const newCount = json?.count ?? 0;
+    els.latestCount.textContent = newCount;
 
-      lastCount = newCount;
-    } catch(e){ console.error(e); }
-  }
+    if (newCount > lastCount) {
+      els.latestCount.classList.add('bg-green-200', 'transition-colors');
+      setTimeout(() => els.latestCount.classList.remove('bg-green-200'), 500);
+    }
 
-  async function fetchThreshold() {
-    try {
-      const r = await fetch(`${BACKEND}/threshold`);
-      const text = await r.text();
-      els.thresholdCurrent.textContent = text;
-    } catch(e){ console.error(e); }
-  }
+    lastCount = newCount;
+  } catch(e){ console.error(e); }
+}
 
-  async function fetchHistory() {
-    try {
-      const r = await fetch(`${BACKEND}/data/history?limit=100`);
-      const data = await r.json();
-      const labels = data.map(d => new Date(d.timestamp).toLocaleTimeString());
-      const counts = data.map(d => d.count);
+async function fetchThreshold() {
+  try {
+    const r = await fetch(`${BACKEND}/threshold`);
+    els.thresholdCurrent.textContent = await r.text();
+  } catch(e){ console.error(e); }
+}
 
-      if (!chart) {
-        const ctx = document.getElementById('historyChart').getContext('2d');
-        chart = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [
-              {
-                label: 'Count',
-                data: counts,
-                borderColor: 'blue',
-                backgroundColor: 'rgba(0,0,255,0.1)',
-                pointBackgroundColor: counts.map((_,i) => i === counts.length-1 ? 'green' : 'blue')
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: { x: { display: true }, y: { beginAtZero: true } }
-          }
-        });
-      } else {
-        chart.data.labels = labels;
-        chart.data.datasets[0].data = counts;
-        chart.data.datasets[0].pointBackgroundColor = counts.map((_,i) => i === counts.length-1 ? 'green' : 'blue');
-        chart.update();
-      }
-    } catch(e){ console.error(e); }
-  }
+async function fetchHistory() {
+  try {
+    const r = await fetch(`${BACKEND}/data/history?limit=100`);
+    const data = await r.json();
+    const labels = data.map(d => new Date(d.timestamp).toLocaleTimeString());
+    const counts = data.map(d => d.count);
 
-  els.saveThreshold.addEventListener('click', async () => {
-    const val = Number(els.thresholdInput.value);
-    if (Number.isNaN(val)) return alert('Enter a valid number');
-    try {
-      await fetch(`${BACKEND}/threshold`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ threshold: val })
+    if (!chart) {
+      const ctx = document.getElementById('historyChart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets: [{ label: 'Count', data: counts, borderColor:'blue', backgroundColor:'rgba(0,0,255,0.1)', pointBackgroundColor: counts.map((_,i)=>i===counts.length-1?'green':'blue') }] },
+        options: { responsive:true, maintainAspectRatio:false, scales:{x:{display:true}, y:{beginAtZero:true}} }
       });
-      els.thresholdInput.value = '';
-      fetchThreshold();
-    } catch(e){ console.error(e); }
-  });
+    } else {
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = counts;
+      chart.data.datasets[0].pointBackgroundColor = counts.map((_,i)=>i===counts.length-1?'green':'blue');
+      chart.update();
+    }
+  } catch(e){ console.error(e); }
+}
 
-  async function refreshAll() {
-    await Promise.all([ fetchStatus(), fetchLatest(), fetchThreshold(), fetchHistory() ]);
-  }
+els.saveThreshold.addEventListener('click', async () => {
+  const val = Number(els.thresholdInput.value);
+  if (Number.isNaN(val)) return alert('Enter a valid number');
+  try {
+    await fetch(`${BACKEND}/threshold`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({threshold: val}) });
+    els.thresholdInput.value = '';
+    fetchThreshold();
+  } catch(e){ console.error(e); }
+});
 
-  document.addEventListener("DOMContentLoaded", () => {
-    refreshAll();
-    setInterval(refreshAll, 5000);
-  });
-  </script>
+els.resetCounter.addEventListener('click', async () => {
+  if (!confirm("Are you sure you want to reset the counter?")) return;
+  try {
+    const r = await fetch(`${BACKEND}/reset`, { method:'POST' });
+    const json = await r.json();
+    if(json.success){ lastCount=0; fetchLatest(); fetchHistory(); }
+  } catch(e){ console.error(e); }
+});
+
+async function refreshAll() {
+  await Promise.all([fetchStatus(), fetchLatest(), fetchThreshold(), fetchHistory()]);
+}
+
+document.addEventListener("DOMContentLoaded", () => { refreshAll(); setInterval(refreshAll, 5000); });
+</script>
 
 </body>
 </html>
